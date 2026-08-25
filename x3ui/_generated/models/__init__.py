@@ -7,11 +7,15 @@ from .api_token import ApiToken
 from .api_token_view import ApiTokenView
 from .client import Client
 from .client_allowed_i_ps_by_inbound import ClientAllowedIPsByInbound
+from .client_detail import ClientDetail
+from .client_detail_external_links_item import ClientDetailExternalLinksItem
+from .client_detail_tunnel_allowed_i_ps import ClientDetailTunnelAllowedIPs
 from .client_inbound import ClientInbound
 from .client_record import ClientRecord
 from .client_reverse import ClientReverse
 from .client_traffic import ClientTraffic
 from .client_traffic_reset import ClientTrafficReset
+from .client_update import ClientUpdate
 from .clients_active_inbounds import ClientsActiveInbounds
 from .clients_add_request import ClientsAddRequest
 from .clients_add_request_client import ClientsAddRequestClient
@@ -770,11 +774,15 @@ __all__ = (
     "ApiTokenView",
     "Client",
     "ClientAllowedIPsByInbound",
+    "ClientDetail",
+    "ClientDetailExternalLinksItem",
+    "ClientDetailTunnelAllowedIPs",
     "ClientInbound",
     "ClientRecord",
     "ClientReverse",
     "ClientTraffic",
     "ClientTrafficReset",
+    "ClientUpdate",
     "ClientsActiveInbounds",
     "ClientsAddRequest",
     "ClientsAddRequestClient",

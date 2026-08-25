@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 from typing_extensions import Self
 
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.client_detail import ClientDetail
+
 
 T = TypeVar("T", bound="GetPanelApiClientsGetEmailResponse200")
 
@@ -18,12 +22,12 @@ class GetPanelApiClientsGetEmailResponse200:
     Attributes:
         success (bool | Unset):
         msg (str | Unset):
-        obj (Any | Unset):
+        obj (ClientDetail | Unset): Read shape for GET /panel/api/clients/get/{email}.
     """
 
     success: bool | Unset = UNSET
     msg: str | Unset = UNSET
-    obj: Any | Unset = UNSET
+    obj: ClientDetail | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -31,7 +35,9 @@ class GetPanelApiClientsGetEmailResponse200:
 
         msg = self.msg
 
-        obj = self.obj
+        obj: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.obj, Unset):
+            obj = self.obj.to_dict()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -47,12 +53,19 @@ class GetPanelApiClientsGetEmailResponse200:
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
+        from ..models.client_detail import ClientDetail
+
         d = dict(src_dict)
         success = d.pop("success", UNSET)
 
         msg = d.pop("msg", UNSET)
 
-        obj = d.pop("obj", UNSET)
+        _obj = d.pop("obj", UNSET)
+        obj: ClientDetail | Unset
+        if isinstance(_obj, Unset):
+            obj = UNSET
+        else:
+            obj = ClientDetail.from_dict(_obj)
 
         get_panel_api_clients_get_email_response_200 = cls(
             success=success,

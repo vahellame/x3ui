@@ -1,10 +1,37 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
+
+GIGABYTE = 1024**3
+
+
+def _bytes(gigabytes: float | None) -> int | None:
+    return None if gigabytes is None else int(gigabytes * GIGABYTE)
+
+
+def _timestamp(expires: datetime | timedelta | int | None) -> int | None:
+    """Normalise an expiry to the Unix milliseconds the panel stores."""
+    if expires is None:
+        return None
+    if isinstance(expires, int):
+        return expires
+    if isinstance(expires, timedelta):
+        expires = datetime.now(timezone.utc) + expires
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    return int(expires.timestamp() * 1000)
 
 from ._generated import AuthenticatedClient, Client
 from ._generated.api.authentication import get_csrf_token, post_login, post_logout
 from ._generated.api.clients import (
+    post_panel_api_clients_bulk_adjust,
+    post_panel_api_clients_bulk_del,
+    post_panel_api_clients_bulk_disable,
+    post_panel_api_clients_bulk_enable,
+    post_panel_api_clients_bulk_reset_traffic,
+    post_panel_api_clients_del_depleted,
+    post_panel_api_clients_del_orphans,
     get_panel_api_clients_get_email,
     get_panel_api_clients_links_email,
     get_panel_api_clients_list,
@@ -35,7 +62,15 @@ from ._generated.models.clients_add_request import ClientsAddRequest
 from ._generated.models.clients_add_request_client import ClientsAddRequestClient
 from ._generated.models.clients_attach_request import ClientsAttachRequest
 from ._generated.models.clients_detach_request import ClientsDetachRequest
-from ._generated.models.clients_update_request import ClientsUpdateRequest
+from ._generated.models.client_detail import ClientDetail
+from ._generated.models.clients_bulk_adjust_request import ClientsBulkAdjustRequest
+from ._generated.models.clients_bulk_del_request import ClientsBulkDelRequest
+from ._generated.models.clients_bulk_disable_request import ClientsBulkDisableRequest
+from ._generated.models.clients_bulk_enable_request import ClientsBulkEnableRequest
+from ._generated.models.clients_bulk_reset_traffic_request import (
+    ClientsBulkResetTrafficRequest,
+)
+from ._generated.models.client_update import ClientUpdate
 from ._generated.models.inbounds_set_enable_request import InboundsSetEnableRequest
 from ._generated.types import UNSET, Unset
 
@@ -114,7 +149,7 @@ class _Clients:
             get_panel_api_clients_list.sync(client=self._panel.raw), "clients.list"
         )
 
-    def get(self, email: str) -> Any:
+    def get(self, email: str) -> ClientDetail:
         return _unwrap(
             get_panel_api_clients_get_email.sync(email, client=self._panel.raw),
             "clients.get",
@@ -158,20 +193,25 @@ class _Clients:
         email: str,
         inbound_ids: list[int],
         *,
-        total_gb: int | None = None,
-        expiry_time: int | None = None,
+        total_gb: float | None = None,
+        expires: datetime | timedelta | int | None = None,
         limit_ip: int | None = None,
         limit_hwid: int | None = None,
         tg_id: int | None = None,
         enable: bool = True,
     ) -> Any:
+        """Create a client and attach it to inbounds.
+
+        `total_gb` is gigabytes and `expires` accepts a datetime, a timedelta
+        from now, or raw Unix milliseconds. Omit either for unlimited.
+        """
         body = ClientsAddRequest(
             client=ClientsAddRequestClient(
                 **_clean(
                     {
                         "email": email,
-                        "total_gb": total_gb,
-                        "expiry_time": expiry_time,
+                        "total_gb": _bytes(total_gb),
+                        "expiry_time": _timestamp(expires),
                         "limit_ip": limit_ip,
                         "limit_hwid": limit_hwid,
                         "tg_id": tg_id,
@@ -191,27 +231,58 @@ class _Clients:
         email: str,
         *,
         new_email: str | None = None,
-        total_gb: int | None = None,
-        expiry_time: int | None = None,
+        password: str | None = None,
+        auth: str | None = None,
+        limit_ip: int | None = None,
         limit_hwid: int | None = None,
+        total_gb: float | None = None,
+        expires: datetime | timedelta | int | None = None,
         tg_id: int | None = None,
+        flow: str | None = None,
+        group: str | None = None,
+        comment: str | None = None,
         enable: bool | None = None,
     ) -> Any:
-        body = ClientsUpdateRequest(
-            **_clean(
-                {
-                    "email": new_email or email,
-                    "total_gb": total_gb,
-                    "expiry_time": expiry_time,
-                    "limit_hwid": limit_hwid,
-                    "tg_id": tg_id,
-                    "enable": enable,
-                }
-            )
+        """Change fields on an existing client.
+
+        The panel replaces the whole row on update, so this reads the current
+        record first and sends it back with the given fields changed.
+        """
+        current = self.get(email).client.to_dict()
+
+        changes = _clean(
+            {
+                "email": new_email,
+                "password": password,
+                "auth": auth,
+                "limitIp": limit_ip,
+                "limitHwid": limit_hwid,
+                "totalGB": _bytes(total_gb),
+                "expiryTime": _timestamp(expires),
+                "tgId": tg_id,
+                "flow": flow,
+                "group": group,
+                "comment": comment,
+                "enable": enable,
+            }
         )
+        current.update(changes)
+
+        uuid = current.pop("uuid", None)
+        if uuid:
+            current["id"] = uuid
+        else:
+            current.pop("id", None)
+
+        allowed = current.get("allowedIPs")
+        if isinstance(allowed, str):
+            current["allowedIPs"] = [
+                part.strip() for part in allowed.split(",") if part.strip()
+            ]
+
         return _unwrap(
             post_panel_api_clients_update_email.sync(
-                email, client=self._panel.raw, body=body
+                email, client=self._panel.raw, body=ClientUpdate.from_dict(current)
             ),
             "clients.update",
         )
@@ -250,6 +321,85 @@ class _Clients:
                 body=ClientsDetachRequest(inbound_ids=inbound_ids),
             ),
             "clients.detach",
+        )
+
+
+    def bulk_enable(self, emails: list[str]) -> Any:
+        return _unwrap(
+            post_panel_api_clients_bulk_enable.sync(
+                client=self._panel.raw,
+                body=ClientsBulkEnableRequest(emails=emails),
+            ),
+            "clients.bulk_enable",
+        )
+
+    def bulk_disable(self, emails: list[str]) -> Any:
+        return _unwrap(
+            post_panel_api_clients_bulk_disable.sync(
+                client=self._panel.raw,
+                body=ClientsBulkDisableRequest(emails=emails),
+            ),
+            "clients.bulk_disable",
+        )
+
+    def bulk_delete(self, emails: list[str], *, keep_traffic: bool = False) -> Any:
+        return _unwrap(
+            post_panel_api_clients_bulk_del.sync(
+                client=self._panel.raw,
+                body=ClientsBulkDelRequest(emails=emails, keep_traffic=keep_traffic),
+            ),
+            "clients.bulk_delete",
+        )
+
+    def bulk_reset_traffic(self, emails: list[str]) -> Any:
+        return _unwrap(
+            post_panel_api_clients_bulk_reset_traffic.sync(
+                client=self._panel.raw,
+                body=ClientsBulkResetTrafficRequest(emails=emails),
+            ),
+            "clients.bulk_reset_traffic",
+        )
+
+    def extend(
+        self,
+        emails: list[str],
+        *,
+        days: int | None = None,
+        gigabytes: float | None = None,
+    ) -> Any:
+        """Add time and traffic to existing clients.
+
+        Both accept negative values. Clients on unlimited time or traffic are
+        skipped for that field: extending never turns unlimited into limited.
+        """
+        return _unwrap(
+            post_panel_api_clients_bulk_adjust.sync(
+                client=self._panel.raw,
+                body=ClientsBulkAdjustRequest(
+                    **_clean(
+                        {
+                            "emails": emails,
+                            "add_days": days,
+                            "add_bytes": _bytes(gigabytes),
+                        }
+                    )
+                ),
+            ),
+            "clients.extend",
+        )
+
+    def delete_depleted(self) -> Any:
+        """Delete every client that ran out of traffic or time."""
+        return _unwrap(
+            post_panel_api_clients_del_depleted.sync(client=self._panel.raw),
+            "clients.delete_depleted",
+        )
+
+    def delete_orphans(self) -> Any:
+        """Delete every client not attached to any inbound."""
+        return _unwrap(
+            post_panel_api_clients_del_orphans.sync(client=self._panel.raw),
+            "clients.delete_orphans",
         )
 
 

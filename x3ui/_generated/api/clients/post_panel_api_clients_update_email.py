@@ -6,7 +6,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.clients_update_request import ClientsUpdateRequest
+from ...models.client_update import ClientUpdate
 from ...models.post_panel_api_clients_update_email_response_200 import (
     PostPanelApiClientsUpdateEmailResponse200,
 )
@@ -16,7 +16,7 @@ from ...types import Response
 def _get_kwargs(
     email: str,
     *,
-    body: ClientsUpdateRequest,
+    body: ClientUpdate,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -66,7 +66,7 @@ def sync_detailed(
     email: str,
     *,
     client: AuthenticatedClient | Client,
-    body: ClientsUpdateRequest,
+    body: ClientUpdate,
 ) -> Response[PostPanelApiClientsUpdateEmailResponse200]:
     """Update an existing client by email. Changes propagate to every attached inbound. Body is the JSON
     client payload — supply the full set of fields you want to keep (the server replaces the row, it
@@ -74,7 +74,8 @@ def sync_detailed(
 
     Args:
         email (str):
-        body (ClientsUpdateRequest):
+        body (ClientUpdate): Write shape for POST /panel/api/clients/update/{email}. The endpoint
+            replaces the whole row, so send every field you want to keep.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -100,7 +101,7 @@ def sync(
     email: str,
     *,
     client: AuthenticatedClient | Client,
-    body: ClientsUpdateRequest,
+    body: ClientUpdate,
 ) -> PostPanelApiClientsUpdateEmailResponse200 | None:
     """Update an existing client by email. Changes propagate to every attached inbound. Body is the JSON
     client payload — supply the full set of fields you want to keep (the server replaces the row, it
@@ -108,7 +109,8 @@ def sync(
 
     Args:
         email (str):
-        body (ClientsUpdateRequest):
+        body (ClientUpdate): Write shape for POST /panel/api/clients/update/{email}. The endpoint
+            replaces the whole row, so send every field you want to keep.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -129,7 +131,7 @@ async def asyncio_detailed(
     email: str,
     *,
     client: AuthenticatedClient | Client,
-    body: ClientsUpdateRequest,
+    body: ClientUpdate,
 ) -> Response[PostPanelApiClientsUpdateEmailResponse200]:
     """Update an existing client by email. Changes propagate to every attached inbound. Body is the JSON
     client payload — supply the full set of fields you want to keep (the server replaces the row, it
@@ -137,7 +139,8 @@ async def asyncio_detailed(
 
     Args:
         email (str):
-        body (ClientsUpdateRequest):
+        body (ClientUpdate): Write shape for POST /panel/api/clients/update/{email}. The endpoint
+            replaces the whole row, so send every field you want to keep.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -161,7 +164,7 @@ async def asyncio(
     email: str,
     *,
     client: AuthenticatedClient | Client,
-    body: ClientsUpdateRequest,
+    body: ClientUpdate,
 ) -> PostPanelApiClientsUpdateEmailResponse200 | None:
     """Update an existing client by email. Changes propagate to every attached inbound. Body is the JSON
     client payload — supply the full set of fields you want to keep (the server replaces the row, it
@@ -169,7 +172,8 @@ async def asyncio(
 
     Args:
         email (str):
-        body (ClientsUpdateRequest):
+        body (ClientUpdate): Write shape for POST /panel/api/clients/update/{email}. The endpoint
+            replaces the whole row, so send every field you want to keep.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

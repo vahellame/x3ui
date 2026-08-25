@@ -5206,6 +5206,55 @@
             "type": "string"
           }
         }
+      },
+      "ClientUpdate": {
+        "description": "Write shape for POST /panel/api/clients/update/{email}. The endpoint replaces the whole row, so send every field you want to keep.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Client"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "limitHwid": {
+                "description": "Maximum registered devices, 0 for unlimited.",
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "ClientDetail": {
+        "description": "Read shape for GET /panel/api/clients/get/{email}.",
+        "type": "object",
+        "properties": {
+          "client": {
+            "$ref": "#/components/schemas/ClientRecord"
+          },
+          "inboundIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "externalLinks": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "usedTraffic": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tunnelAllowedIPs": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "client",
+          "inboundIds"
+        ]
       }
     }
   },
@@ -8388,7 +8437,9 @@
                     "msg": {
                       "type": "string"
                     },
-                    "obj": {}
+                    "obj": {
+                      "$ref": "#/components/schemas/ClientDetail"
+                    }
                   }
                 }
               }
@@ -8521,7 +8572,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ClientsUpdateRequest"
+                "$ref": "#/components/schemas/ClientUpdate"
               },
               "example": {
                 "email": "alice@example.com",

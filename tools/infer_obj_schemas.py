@@ -145,14 +145,44 @@ def fill_request_bodies(spec):
     return filled, skipped, already
 
 
+def apply_overrides(spec, overrides_path):
+    if not overrides_path.exists():
+        return 0
+    data = json.loads(overrides_path.read_text())
+    schemas = spec.setdefault("components", {}).setdefault("schemas", {})
+    schemas.update(data.get("components", {}))
+
+    applied = 0
+    for key, ref in data.get("responses", {}).items():
+        route, method = key.rsplit("|", 1)
+        body = (
+            spec["paths"][route][method]["responses"]["200"]["content"]["application/json"]
+        )
+        body.setdefault("schema", {}).setdefault("properties", {})["obj"] = {"$ref": ref}
+        applied += 1
+
+    for key, ref in data.get("requestBodies", {}).items():
+        route, method = key.rsplit("|", 1)
+        operation = spec["paths"][route][method]
+        operation.setdefault("requestBody", {"required": True}).setdefault(
+            "content", {}
+        ).setdefault("application/json", {})["schema"] = {"$ref": ref}
+        applied += 1
+
+    return applied
+
+
 def main(path):
     spec = json.loads(path.read_text())
 
     r_filled, r_skipped, r_already = fill_responses(spec)
     b_filled, b_skipped, b_already = fill_request_bodies(spec)
 
+    applied = apply_overrides(spec, path.parent / "tools" / "overrides.json")
+
     path.write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n")
 
+    print(f"overrides:      applied {applied}")
     print(f"responses:      filled {r_filled}, untyped {r_skipped}, already typed {r_already}")
     print(f"request bodies: filled {b_filled}, untyped {b_skipped}, already typed {b_already}")
 
