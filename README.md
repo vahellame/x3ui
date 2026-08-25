@@ -14,293 +14,221 @@ Unofficial project. Not affiliated with the [3x-ui](https://github.com/MHSanaei/
 pip install x3ui
 ```
 
-Requires Python 3.9+.
+Requires Python 3.10 or newer.
 
 ## Quick start
 
 ```python
-from x3ui import AuthenticatedClient
-from x3ui.api.inbounds import get_panel_api_inbounds_list
+from x3ui import Panel
 
-client = AuthenticatedClient(base_url="https://panel.example.com:2053", token="YOUR_API_TOKEN")
+with Panel("https://panel.example.com:2053") as panel:
+    panel.login("admin", "admin")
 
-result = get_panel_api_inbounds_list.sync(client=client)
-print(result.success, result.obj)
+    for inbound in panel.inbounds.list():
+        print(inbound.id, inbound.remark, inbound.protocol, inbound.port)
+
+    print(panel.clients.online())
 ```
 
-Base URL must include the port and the panel's base path if you configured one, for example `https://panel.example.com:2053/mypath`.
+Base URL must include the port and the panel's base path if one is configured, for example `https://panel.example.com:2053/mypath`.
+
+## Two layers
+
+`Panel` is the high-level interface. It authenticates, unwraps the panel's `{success, msg, obj}` envelope, and raises `X3uiError` when the panel reports a failure — so methods return the payload directly.
+
+Everything the facade does not wrap is reachable through the generated layer, which covers all 186 operations. Pass `panel.raw` as the client:
+
+```python
+from x3ui._generated.api.hosts import get_panel_api_hosts_list
+
+response = get_panel_api_hosts_list.sync(client=panel.raw)
+print(response.success, response.obj)
+```
+
+The generated layer is regenerated from the specification, so its names track the panel's routes and can change between releases. The facade is hand-written and stable.
 
 ## Authentication
 
-The panel supports two schemes.
-
-### API token (recommended)
-
-Create a token in the panel under Settings → Security → API Token, or through the API, then pass it to `AuthenticatedClient`. Requests are sent with an `Authorization: Bearer <token>` header.
-
-```python
-from x3ui import AuthenticatedClient
-
-client = AuthenticatedClient(base_url="https://panel.example.com:2053", token="YOUR_API_TOKEN")
-```
-
-Creating a token programmatically:
-
-```python
-from x3ui.api.api_tokens import post_panel_api_setting_api_tokens_create
-from x3ui.models.post_panel_api_setting_api_tokens_create_body import PostPanelApiSettingApiTokensCreateBody
-
-body = PostPanelApiSettingApiTokensCreateBody(name="automation", scope="admin", expires_at=0)
-result = post_panel_api_setting_api_tokens_create.sync(client=client, body=body)
-```
-
-`scope` is `admin`, `monitor`, or `node-sync`. `expires_at` is a future Unix timestamp in milliseconds; `0` means no expiry. The plaintext token is returned only once, at creation — the panel stores only a hash.
-
 ### Username and password
 
-Log in with the panel admin credentials, then keep using the same `Client` instance. The session cookie the panel sets is stored in the client's underlying HTTP session and sent automatically on every subsequent call.
-
 ```python
-from x3ui import Client
-from x3ui.api.authentication import post_login
-from x3ui.api.inbounds import get_panel_api_inbounds_list
-from x3ui.models.post_login_body import PostLoginBody
-
-client = Client(base_url="https://panel.example.com:2053")
-
-login = post_login.sync(
-    client=client,
-    body=PostLoginBody(username="admin", password="admin", two_factor_code=""),
-)
-
-if not login.success:
-    raise RuntimeError(login.msg)
-
-result = get_panel_api_inbounds_list.sync(client=client)
-print(result.obj)
+panel = Panel("https://panel.example.com:2053")
+panel.login("admin", "admin")
 ```
 
-Pass an empty string as `two_factor_code` when two-factor authentication is disabled on the panel. When it is enabled, pass the current OTP code — it rotates every 30 seconds, so generate it immediately before logging in.
+`login` fetches a CSRF token before sending the credentials. The panel rejects unauthenticated POST requests — including the login request itself — with an empty `403` when the `X-CSRF-Token` header is absent, so the order matters. The session cookie is kept afterwards; keep using the same `Panel` object.
 
-Reuse the same `client` object for everything that follows. Creating a second `Client`, or calling `with_headers` / `with_cookies` / `with_timeout` after logging in, produces a new instance with a fresh HTTP session that does not carry the session cookie, and calls will come back unauthenticated.
-
-#### CSRF token for write operations
-
-Session-based callers must send an `X-CSRF-Token` header on unsafe requests (POST, DELETE). Mint one after logging in and attach it to the existing session:
+With two-factor authentication enabled, pass the current OTP code. It rotates every 30 seconds, so generate it immediately before logging in:
 
 ```python
-from x3ui.api.authentication import get_csrf_token
-
-csrf = get_csrf_token.sync(client=client)
-client.get_httpx_client().headers["X-CSRF-Token"] = csrf.obj
+panel.login("admin", "admin", two_factor_code="123456")
 ```
 
-Setting the header on the underlying HTTP client keeps the session cookie intact, which `with_headers` would not. Bearer token callers skip this step entirely — CSRF is not enforced for token-authenticated requests.
-
-#### Logging out
+### API token
 
 ```python
-from x3ui.api.authentication import post_logout
-
-post_logout.sync(client=client)
+panel = Panel("https://panel.example.com:2053", token="YOUR_API_TOKEN")
 ```
+
+Create a token in the panel under Settings → Security → API Token. Requests are sent with an `Authorization: Bearer <token>` header, and CSRF does not apply. The plaintext token is shown once at creation; the panel stores only a hash.
+
+An API token is a full-admin credential — treat it like the panel password.
 
 ## Common operations
 
-### List all clients
+### Inbounds
 
 ```python
-from x3ui.api.clients import get_panel_api_clients_list
-
-result = get_panel_api_clients_list.sync(client=client)
+panel.inbounds.list()
+panel.inbounds.get(1)
+panel.inbounds.set_enable(1, False)
+panel.inbounds.reset_traffic(1)
 ```
 
-For large panels use `get_panel_api_clients_list_paged` instead.
+`list()` returns typed `Inbound` objects with `client_stats` attached.
 
-### Look up a client by email
+### Clients
 
 ```python
-from x3ui.api.clients import get_panel_api_clients_get_email
-
-result = get_panel_api_clients_get_email.sync("user@example.com", client=client)
+panel.clients.list()
+panel.clients.get("alice@example.com")
+panel.clients.traffic("alice@example.com")
+panel.clients.links("alice@example.com")
+panel.clients.sub_links("abcd1234")
+panel.clients.online()
+panel.clients.ips("alice@example.com")
 ```
 
-The email is the client identifier in 3x-ui, not a real address.
+The email is the client identifier in 3x-ui, not necessarily a real address.
 
-### Get traffic for a client
+Creating a client and attaching it to inbounds in one call:
 
 ```python
-from x3ui.api.clients import get_panel_api_clients_traffic_email
-
-result = get_panel_api_clients_traffic_email.sync("user@example.com", client=client)
+panel.clients.add(
+    "alice@example.com",
+    inbound_ids=[3, 5],
+    total_gb=53687091200,
+    expiry_time=1735689600000,
+    limit_ip=2,
+)
 ```
 
-### Get subscription links for a client
+Per-protocol secrets (UUID, password, keys) are generated by the panel when omitted. Byte counts are bytes; timestamps are Unix milliseconds, where `0` means unlimited.
+
+Changing and removing:
 
 ```python
-from x3ui.api.clients import get_panel_api_clients_links_email
-
-result = get_panel_api_clients_links_email.sync("user@example.com", client=client)
+panel.clients.update("alice@example.com", total_gb=107374182400, enable=True)
+panel.clients.reset_traffic("alice@example.com")
+panel.clients.attach("alice@example.com", [7, 9])
+panel.clients.detach("alice@example.com", [5])
+panel.clients.delete("alice@example.com", keep_traffic=True)
 ```
 
-### Reset a client's traffic counter
+`update` replaces the fields you pass; anything omitted is left as stored.
+
+### Server
 
 ```python
-from x3ui.api.clients import post_panel_api_clients_reset_traffic_email
-
-result = post_panel_api_clients_reset_traffic_email.sync("user@example.com", client=client)
+panel.server.status()
+panel.server.new_uuid()
+panel.server.restart_xray()
 ```
 
-### Delete a client
+## Error handling
 
 ```python
-from x3ui.api.clients import post_panel_api_clients_del_email
+from x3ui import NotAuthenticated, X3uiError
 
-result = post_panel_api_clients_del_email.sync("user@example.com", client=client, keep_traffic=0)
+try:
+    panel.clients.get("nobody")
+except NotAuthenticated:
+    panel.login("admin", "admin")
+except X3uiError as error:
+    print(error.operation, error.message)
 ```
 
-Pass `keep_traffic=1` to keep the accumulated traffic statistics after removal.
+`X3uiError` is raised when the panel answers with `success: false`; `NotAuthenticated` is the subclass raised when the message points at an expired or missing session. Network timeouts surface as `httpx.TimeoutException`.
 
-### List clients that are currently online
+## Configuration
 
 ```python
-from x3ui.api.clients import post_panel_api_clients_onlines
-
-result = post_panel_api_clients_onlines.sync(client=client)
+panel = Panel(
+    "https://panel.example.com:2053",
+    token="YOUR_API_TOKEN",
+    timeout=60.0,
+    verify_ssl=False,
+)
 ```
 
-### Get a single inbound
+`verify_ssl=False` disables certificate verification — only for panels with self-signed certificates, never in production. Extra keyword arguments are passed through to the underlying `httpx` client.
+
+For direct access to the HTTP session:
 
 ```python
-from x3ui.api.inbounds import get_panel_api_inbounds_get_id
-
-result = get_panel_api_inbounds_get_id.sync(1, client=client)
+panel.raw.get_httpx_client()
 ```
 
-### Server status
+## Async
 
-```python
-from x3ui.api.server import get_panel_api_server_status
-
-result = get_panel_api_server_status.sync(client=client)
-```
-
-Returns CPU, memory, uptime, network counters and Xray state.
-
-## Async usage
-
-Every endpoint module exposes `asyncio` and `asyncio_detailed` alongside the sync variants. Import them under an alias to avoid shadowing the standard library module:
+The facade is synchronous. Every generated operation also has `asyncio` and `asyncio_detailed` variants — import them under an alias so they do not shadow the standard library module:
 
 ```python
 import asyncio as aio
 
-from x3ui import AuthenticatedClient
-from x3ui.api.clients import get_panel_api_clients_list
+from x3ui import Panel
+from x3ui._generated.api.inbounds import get_panel_api_inbounds_list
 
 async def main():
-    client = AuthenticatedClient(base_url="https://panel.example.com:2053", token="YOUR_API_TOKEN")
-    result = await get_panel_api_clients_list.asyncio(client=client)
+    panel = Panel("https://panel.example.com:2053", token="YOUR_API_TOKEN")
+    result = await get_panel_api_inbounds_list.asyncio(client=panel.raw)
     print(result.obj)
 
 aio.run(main())
 ```
 
-## Detailed responses
-
-The plain `sync` and `asyncio` functions return the parsed model, or `None` when the status code is undocumented. Use the `_detailed` variants when you need the status code, headers or raw bytes:
-
-```python
-from x3ui.api.server import get_panel_api_server_status
-
-response = get_panel_api_server_status.sync_detailed(client=client)
-
-print(response.status_code)
-print(response.headers)
-print(response.parsed)
-print(response.content)
-```
-
-## Error handling
-
-By default, undocumented status codes yield `None`. To raise instead:
-
-```python
-client = AuthenticatedClient(
-    base_url="https://panel.example.com:2053",
-    token="YOUR_API_TOKEN",
-    raise_on_unexpected_status=True,
-)
-```
-
-The raised exception is `x3ui.errors.UnexpectedStatus`, which carries `status_code` and `content`. Network timeouts surface as `httpx.TimeoutException`.
-
-## Client configuration
-
-```python
-import httpx
-
-client = AuthenticatedClient(
-    base_url="https://panel.example.com:2053",
-    token="YOUR_API_TOKEN",
-    timeout=httpx.Timeout(30.0),
-    verify_ssl=False,
-    follow_redirects=True,
-    headers={"User-Agent": "my-bot/1.0"},
-)
-```
-
-`verify_ssl=False` disables certificate verification. Only use it against panels with self-signed certificates, never in production. To pin a custom CA, pass a path to the certificate file instead.
-
-For anything not exposed directly, reach the underlying httpx client:
-
-```python
-raw = client.get_httpx_client()
-```
+An async facade is not implemented yet.
 
 ## Endpoint groups
 
-Endpoints live under `x3ui.api.<group>`, mirroring the tags in the specification:
+Generated modules live under `x3ui._generated.api.<group>`, mirroring the tags in the specification: `authentication`, `clients`, `inbounds`, `server`, `settings`, `xray_settings`, `nodes`, `hosts`, `backup`, `api_tokens`, `subscription_server`, `subscription_balancers`, `web_socket`.
 
-| Group | Contents |
-| --- | --- |
-| `authentication` | login, logout, CSRF token, 2FA |
-| `clients` | CRUD, traffic, groups, IP limits, HWIDs, bulk operations |
-| `inbounds` | CRUD, enable/disable, fallbacks, traffic resets, import/export |
-| `server` | status, Xray control, certificates, metrics, database |
-| `settings` | panel settings |
-| `xray_settings` | Xray core configuration |
-| `nodes` | multi-node management |
-| `hosts` | host entries |
-| `backup` | backup and restore |
-| `api_tokens` | token management |
-| `subscription_server` | subscription service |
-| `subscription_balancers` | subscription balancers |
-| `web_socket` | websocket endpoints |
+Module names follow `<method>_<path>`, so `POST /panel/api/clients/add` becomes `x3ui._generated.api.clients.post_panel_api_clients_add`.
 
-Module names follow the pattern `<method>_<path>`, so `POST /panel/api/clients/add` becomes `x3ui.api.clients.post_panel_api_clients_add`.
+## Typing
 
-## Known limitations
+The panel returns every payload inside `obj`, and its specification leaves most of those undescribed. Before generation, `tools/infer_obj_schemas.py` reads the response and request examples in the document and writes back the schemas it can infer, typing 61 responses and 43 request bodies that would otherwise be `Any`.
 
-Response payloads arrive as `{success, msg, obj}` where `obj` is typed `Any`, because the upstream specification does not describe it. You get typed envelopes but untyped payloads.
+Inferred object schemas are hoisted into `components/schemas` under names derived from the route, so the generated models read as `ServerStatus`, `ClientsListItem` and `ClientsAddRequest` rather than `GetPanelApiServerStatusResponse200Obj`:
 
-Some request bodies are empty models for the same reason. Where a body model has no fields, the corresponding operation cannot be fully expressed through this client yet.
+```python
+status = panel.server.status()
+print(status.cpu, status.xray.state)
+```
 
-Do not run Python from inside the installed package directory. The package contains a `types.py` module that shadows the standard library `types` and causes a circular import.
+The remaining 101 responses carry no example, stay `Any`, and come back as plain dicts and lists.
 
 ## Regenerating
 
-The client is generated from `openapi.json` in this repository:
+```
+./regenerate.sh
+```
+
+Or pull a fresh document from a live panel first:
 
 ```
-pip install openapi-python-client
-openapi-python-client generate --path openapi.json --meta none --output-path x3ui --overwrite
+PANEL_URL=https://panel.example.com:2053/basepath PANEL_TOKEN=... ./regenerate.sh --fetch
 ```
+
+The script resets the `servers` entry before writing the file. A specification fetched from a live panel contains that panel's base path, which is a security-relevant secret — never commit it.
+
+Regeneration only replaces `x3ui/_generated`. The facade in `x3ui/__init__.py` and `x3ui/panel.py` is hand-written and survives.
 
 Generated against 3x-ui version 3.x. Endpoints may differ on other panel versions.
 
 ## Contributing
 
-Improvements to `openapi.json` are the most valuable contribution: adding `operationId` values produces readable function names, and describing `obj` schemas makes responses properly typed. Open an issue or a pull request.
+The most valuable contribution is describing more of the specification: the panel documents `obj` for only a fraction of its endpoints, and every schema added there turns a dict into a typed model for everyone. Adding facade coverage for endpoints that currently need the generated layer is equally welcome.
 
 ## License
 

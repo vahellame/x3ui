@@ -1,0 +1,143 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Any, TypeVar
+
+from attrs import define as _attrs_define
+from attrs import field as _attrs_field
+from typing_extensions import Self
+
+from ..types import UNSET, Unset
+
+T = TypeVar("T", bound="NodesAddRequest")
+
+
+@_attrs_define
+class NodesAddRequest:
+    """
+    Attributes:
+        name (str | Unset):
+        remark (str | Unset):
+        scheme (str | Unset):
+        address (str | Unset):
+        port (int | Unset):
+        base_path (str | Unset):
+        api_token (str | Unset):
+        clear_api_token (bool | Unset):
+        enable (bool | Unset):
+        allow_private_address (bool | Unset):
+    """
+
+    name: str | Unset = UNSET
+    remark: str | Unset = UNSET
+    scheme: str | Unset = UNSET
+    address: str | Unset = UNSET
+    port: int | Unset = UNSET
+    base_path: str | Unset = UNSET
+    api_token: str | Unset = UNSET
+    clear_api_token: bool | Unset = UNSET
+    enable: bool | Unset = UNSET
+    allow_private_address: bool | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        name = self.name
+
+        remark = self.remark
+
+        scheme = self.scheme
+
+        address = self.address
+
+        port = self.port
+
+        base_path = self.base_path
+
+        api_token = self.api_token
+
+        clear_api_token = self.clear_api_token
+
+        enable = self.enable
+
+        allow_private_address = self.allow_private_address
+
+        field_dict: dict[str, Any] = {}
+        field_dict.update(self.additional_properties)
+        field_dict.update({})
+        if name is not UNSET:
+            field_dict["name"] = name
+        if remark is not UNSET:
+            field_dict["remark"] = remark
+        if scheme is not UNSET:
+            field_dict["scheme"] = scheme
+        if address is not UNSET:
+            field_dict["address"] = address
+        if port is not UNSET:
+            field_dict["port"] = port
+        if base_path is not UNSET:
+            field_dict["basePath"] = base_path
+        if api_token is not UNSET:
+            field_dict["apiToken"] = api_token
+        if clear_api_token is not UNSET:
+            field_dict["clearApiToken"] = clear_api_token
+        if enable is not UNSET:
+            field_dict["enable"] = enable
+        if allow_private_address is not UNSET:
+            field_dict["allowPrivateAddress"] = allow_private_address
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
+        d = dict(src_dict)
+        name = d.pop("name", UNSET)
+
+        remark = d.pop("remark", UNSET)
+
+        scheme = d.pop("scheme", UNSET)
+
+        address = d.pop("address", UNSET)
+
+        port = d.pop("port", UNSET)
+
+        base_path = d.pop("basePath", UNSET)
+
+        api_token = d.pop("apiToken", UNSET)
+
+        clear_api_token = d.pop("clearApiToken", UNSET)
+
+        enable = d.pop("enable", UNSET)
+
+        allow_private_address = d.pop("allowPrivateAddress", UNSET)
+
+        nodes_add_request = cls(
+            name=name,
+            remark=remark,
+            scheme=scheme,
+            address=address,
+            port=port,
+            base_path=base_path,
+            api_token=api_token,
+            clear_api_token=clear_api_token,
+            enable=enable,
+            allow_private_address=allow_private_address,
+        )
+
+        nodes_add_request.additional_properties = d
+        return nodes_add_request
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties
