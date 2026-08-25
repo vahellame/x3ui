@@ -36,7 +36,7 @@ The panel supports two schemes.
 
 ### API token (recommended)
 
-Create a token in the panel UI under Settings, or through the API, then pass it to `AuthenticatedClient`. Requests are sent with an `Authorization: Bearer <token>` header.
+Create a token in the panel under Settings → Security → API Token, or through the API, then pass it to `AuthenticatedClient`. Requests are sent with an `Authorization: Bearer <token>` header.
 
 ```python
 from x3ui import AuthenticatedClient
@@ -54,26 +54,56 @@ body = PostPanelApiSettingApiTokensCreateBody(name="automation", scope="admin", 
 result = post_panel_api_setting_api_tokens_create.sync(client=client, body=body)
 ```
 
-`expires_at` is a Unix timestamp; `0` means no expiry.
+`scope` is `admin`, `monitor`, or `node-sync`. `expires_at` is a future Unix timestamp in milliseconds; `0` means no expiry. The plaintext token is returned only once, at creation — the panel stores only a hash.
 
-### Session cookie
+### Username and password
+
+Log in with the panel admin credentials, then keep using the same `Client` instance. The session cookie the panel sets is stored in the client's underlying HTTP session and sent automatically on every subsequent call.
 
 ```python
 from x3ui import Client
 from x3ui.api.authentication import post_login
+from x3ui.api.inbounds import get_panel_api_inbounds_list
 from x3ui.models.post_login_body import PostLoginBody
 
 client = Client(base_url="https://panel.example.com:2053")
 
-response = post_login.sync_detailed(
+login = post_login.sync(
     client=client,
     body=PostLoginBody(username="admin", password="admin", two_factor_code=""),
 )
 
-client = client.with_cookies({"3x-ui": response.cookies.get("3x-ui")})
+if not login.success:
+    raise RuntimeError(login.msg)
+
+result = get_panel_api_inbounds_list.sync(client=client)
+print(result.obj)
 ```
 
-Pass an empty string as `two_factor_code` when 2FA is disabled. The session cookie is not stored automatically: `Client` is immutable, so `with_cookies` returns a new instance that you need to keep and reuse.
+Pass an empty string as `two_factor_code` when two-factor authentication is disabled on the panel. When it is enabled, pass the current OTP code — it rotates every 30 seconds, so generate it immediately before logging in.
+
+Reuse the same `client` object for everything that follows. Creating a second `Client`, or calling `with_headers` / `with_cookies` / `with_timeout` after logging in, produces a new instance with a fresh HTTP session that does not carry the session cookie, and calls will come back unauthenticated.
+
+#### CSRF token for write operations
+
+Session-based callers must send an `X-CSRF-Token` header on unsafe requests (POST, DELETE). Mint one after logging in and attach it to the existing session:
+
+```python
+from x3ui.api.authentication import get_csrf_token
+
+csrf = get_csrf_token.sync(client=client)
+client.get_httpx_client().headers["X-CSRF-Token"] = csrf.obj
+```
+
+Setting the header on the underlying HTTP client keeps the session cookie intact, which `with_headers` would not. Bearer token callers skip this step entirely — CSRF is not enforced for token-authenticated requests.
+
+#### Logging out
+
+```python
+from x3ui.api.authentication import post_logout
+
+post_logout.sync(client=client)
+```
 
 ## Common operations
 
