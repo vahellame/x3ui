@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build distributions
+        run: |
+          pip install build
+          python -m build
+
+      - name: Install wheel
+        run: pip install dist/*.whl
+
+      - name: Smoke test
+        run: |
+          cd /tmp
+          python -c "from x3ui import Client, AuthenticatedClient; print('import ok')"
+          python -c "from x3ui.api.inbounds import get_panel_api_inbounds_list; print('endpoints ok')"
+          python -c "from x3ui.models.post_login_body import PostLoginBody; print('models ok')"
