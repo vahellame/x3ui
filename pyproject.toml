@@ -41,4 +41,4 @@ Changelog = "https://github.com/vahellame/x3ui/blob/main/CHANGELOG.md"
 packages = ["x3ui"]
 
 [tool.hatch.build.targets.sdist]
-include = ["x3ui", "tools", "openapi.json", "regenerate.sh", "README.md", "LICENSE", "CHANGELOG.md", "CONTRIBUTING.md"]
+include = ["x3ui", "tools", "openapi.json", "regenerate.sh", "README.md", "README.ru.md", "LICENSE", "CHANGELOG.md", "CONTRIBUTING.md"]

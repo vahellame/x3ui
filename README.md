@@ -4,6 +4,8 @@
 [![CI](https://github.com/vahellame/x3ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vahellame/x3ui/actions/workflows/ci.yml)
 [![License](https://img.shields.io/pypi/l/x3ui)](https://github.com/vahellame/x3ui/blob/main/LICENSE)
 
+[Русский](README.ru.md)
+
 Automate your 3x-ui panel from Python. Issue users, renew subscriptions, check usage, clean up expired accounts — without clicking through the web UI.
 
 Unofficial project. Not affiliated with the [3x-ui](https://github.com/MHSanaei/3x-ui) developers.

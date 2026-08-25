@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bytes, and `expires` accepting a `datetime`, a `timedelta` from now, or raw
   Unix milliseconds, replacing `expiry_time`.
 - README rewritten around administration tasks rather than the shape of the
-  generated code.
+  generated code; development notes moved to `CONTRIBUTING.md`.
+- Added a Russian translation of the README.
 
 ## [2.0.0] - 2026-08-25
 
