@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "x3ui"
-version = "0.1.1"
+version = "1.0.0"
 description = "Typed Python client for the 3x-ui panel API, generated from OpenAPI"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,7 +12,7 @@ license = "MIT"
 authors = [{ name = "Vadim Reznichenko", email = "vahellame@gmail.com" }]
 keywords = ["3x-ui", "xui", "xray", "openapi", "api-client", "vpn"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -35,9 +35,10 @@ dependencies = [
 Homepage = "https://github.com/vahellame/x3ui"
 Repository = "https://github.com/vahellame/x3ui"
 Issues = "https://github.com/vahellame/x3ui/issues"
+Changelog = "https://github.com/vahellame/x3ui/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["x3ui"]
 
 [tool.hatch.build.targets.sdist]
-include = ["x3ui", "openapi.json", "README.md", "LICENSE"]
+include = ["x3ui", "openapi.json", "README.md", "LICENSE", "CHANGELOG.md"]

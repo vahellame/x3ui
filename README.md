@@ -266,7 +266,7 @@ pip install openapi-python-client
 openapi-python-client generate --path openapi.json --meta none --output-path x3ui --overwrite
 ```
 
-Generated against 3x-ui version X.Y.Z. Endpoints may differ on other panel versions.
+Generated against 3x-ui version 3.x. Endpoints may differ on other panel versions.
 
 ## Contributing
 
