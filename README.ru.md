@@ -6,208 +6,144 @@
 
 [English](README.md)
 
-Автоматизация панели 3x-ui на Python. Выдавать пользователей, продлевать подписки, смотреть расход трафика, чистить просроченные аккаунты — не заходя в веб-интерфейс.
-
-Неофициальный проект, с разработчиками [3x-ui](https://github.com/MHSanaei/3x-ui) не связан.
+Python-клиент к API панели 3x-ui. Неофициальный, с разработчиками [3x-ui](https://github.com/MHSanaei/3x-ui) не связан.
 
 ```
 pip install x3ui
 ```
 
-## Подключение
-
-```python
-from x3ui import Panel
-
-panel = Panel("https://panel.example.com:2053/yourpath")
-panel.login("admin", "your-password")
-```
-
-URL — ровно тот, что вы вводите в браузере, вместе с портом и секретным путём панели.
-
-Для всего, что работает без присмотра, лучше API-токен — создайте его в Settings → Security → API Token:
-
-```python
-panel = Panel("https://panel.example.com:2053/yourpath", token="...")
-```
-
-Токен даёт полные права администратора. Не держите его в коде — читайте из переменных окружения.
-
-## Выдать пользователя
+## Использование
 
 ```python
 from datetime import timedelta
 
+from x3ui import Panel
+
+panel = Panel("https://panel.example.com:2053/yourpath", token="...")
+
+panel.clients.add("alice", inbound_ids=[3], total_gb=100, expires=timedelta(days=30))
+print(panel.clients.links("alice"))
+```
+
+## Подключение
+
+```python
+panel = Panel(url, token="...")
+
+panel = Panel(url).login("admin", "password")
+panel = Panel(url).login("admin", "password", two_factor_code="123456")
+```
+
+`url` включает порт и базовый путь панели. Дополнительные аргументы: `verify_ssl`, `timeout` и всё остальное, что принимает `httpx.Client`.
+
+`Panel` работает как контекстный менеджер и закрывает соединение на выходе.
+
+## Клиенты
+
+```python
+panel.clients.list()
+panel.clients.get("alice")
+panel.clients.traffic("alice")
+panel.clients.links("alice")
+panel.clients.sub_links("subid")
+panel.clients.online()
+panel.clients.ips("alice")
+```
+
+```python
 panel.clients.add(
     "alice",
-    inbound_ids=[3],
+    inbound_ids=[3, 5],
     total_gb=100,
     expires=timedelta(days=30),
     limit_ip=3,
+    limit_hwid=10,
 )
-
-for link in panel.clients.links("alice"):
-    print(link)
 ```
 
-Имя — то, по чему вы сами узнаёте пользователя. Панель называет это поле «email», но настоящий адрес там не обязателен.
-
-Трафик задаётся в гигабайтах, срок — через `timedelta` от текущего момента или через `datetime`. Не указали — значит без ограничения. UUID, пароли и ключи панель генерирует сама.
-
-`links()` возвращает ссылки для подключения по всем инбаундам пользователя — именно их вы ему отправляете. Если нужна ссылка на подписку, используйте `subId`:
+`total_gb` — гигабайты, `expires` принимает `timedelta`, `datetime` или Unix-миллисекунды. Без них — безлимит. Секреты генерирует панель.
 
 ```python
-panel.clients.sub_links(panel.clients.get("alice").client.sub_id)
-```
-
-Не знаете ID своих инбаундов — посмотрите список:
-
-```python
-for inbound in panel.inbounds.list():
-    print(inbound.id, inbound.remark, inbound.protocol, inbound.port)
-```
-
-## Продлить и пополнить
-
-```python
-panel.clients.extend(["alice", "bob"], days=30, gigabytes=100)
-```
-
-Работает с любым числом пользователей за раз и принимает отрицательные значения, если нужно наоборот забрать время или трафик. Тех, у кого срок или трафик безлимитный, метод не трогает — продление не превращает безлимит в ограничение.
-
-Если пользователь исчерпал лимит и был автоматически отключён, продление включит его обратно.
-
-Обнулить счётчик вместо пополнения:
-
-```python
-panel.clients.reset_traffic("alice")
-panel.clients.bulk_reset_traffic(["alice", "bob"])
-```
-
-## Посмотреть расход
-
-```python
-usage = panel.clients.traffic("alice")
-print(usage.up, usage.down, usage.total, usage.expiry_time)
-```
-
-`up` и `down` — израсходованные байты, `total` — квота (`0` означает безлимит).
-
-Кто сейчас на связи:
-
-```python
-print(panel.clients.online())
-```
-
-С каких адресов подключается пользователь:
-
-```python
-print(panel.clients.ips("alice"))
-```
-
-Все сразу — для дашборда или отчёта:
-
-```python
-for client in panel.clients.list():
-    used = client.traffic.up + client.traffic.down
-    print(client.email, used, client.enable)
-```
-
-## Изменить и отозвать
-
-```python
+panel.clients.update("alice", uuid="...", password="...", auth="...")
 panel.clients.update("alice", limit_ip=1000, limit_hwid=10)
-panel.clients.update("alice", password="new-secret", auth="new-secret")
-panel.clients.update("alice", enable=False)
+panel.clients.update("alice", total_gb=200, expires=timedelta(days=90))
+panel.clients.update("alice", enable=False, new_email="alice-2")
 ```
 
-Меняются только переданные поля, остальное остаётся как было. Смена секрета делает старые ссылки пользователя нерабочими — отправьте ему новые из `links()`.
-
-Отключить одного или сразу многих:
+`update` читает текущую запись и отправляет обратно с заменёнными полями — эндпоинт панели перезаписывает строку целиком.
 
 ```python
-panel.clients.bulk_disable(["alice", "bob"])
-panel.clients.bulk_enable(["alice"])
-
-panel.clients.delete("alice")
-panel.clients.bulk_delete(["alice", "bob"], keep_traffic=True)
-```
-
-`keep_traffic` сохраняет записи учёта после удаления пользователя — это важно, если вы по ним выставляете счета.
-
-Перенести пользователя между инбаундами, не пересоздавая:
-
-```python
+panel.clients.delete("alice", keep_traffic=True)
+panel.clients.reset_traffic("alice")
 panel.clients.attach("alice", [7, 9])
 panel.clients.detach("alice", [3])
 ```
 
-## Уборка
+### Пачкой
 
 ```python
-print(panel.clients.delete_depleted())
-print(panel.clients.delete_orphans())
+panel.clients.extend(["alice", "bob"], days=30, gigabytes=100)
+panel.clients.bulk_enable([...])
+panel.clients.bulk_disable([...])
+panel.clients.bulk_delete([...], keep_traffic=False)
+panel.clients.bulk_reset_traffic([...])
+panel.clients.delete_depleted()
+panel.clients.delete_orphans()
 ```
 
-Первый метод удаляет всех, у кого кончился трафик или истёк срок, второй — тех, кто остался без инбаундов после их удаления. Оба необратимы и возвращают количество удалённых.
+`extend` принимает отрицательные значения и пропускает клиентов, у которых по изменяемому полю нет лимита.
 
-## Сервер и Xray
+## Инбаунды
 
 ```python
-status = panel.server.status()
-print(status.cpu, status.mem.current, status.xray.state)
+panel.inbounds.list()
+panel.inbounds.get(3)
+panel.inbounds.set_enable(3, False)
+panel.inbounds.reset_traffic(3)
+```
 
+## Сервер
+
+```python
+panel.server.status()
+panel.server.new_uuid()
 panel.server.restart_xray()
 ```
 
-## Когда что-то пошло не так
+## Ошибки
 
 ```python
 from x3ui import NotAuthenticated, X3uiError
 
 try:
     panel.clients.add("alice", inbound_ids=[3])
+except NotAuthenticated:
+    ...
 except X3uiError as error:
-    print(error.message)
+    print(error.operation, error.message)
 ```
 
-`X3uiError` несёт то же сообщение, которое показала бы сама панель, — «email already in use», «port already in use» и подобные. `NotAuthenticated` возникает, когда сессия истекла: залогиньтесь заново и повторите. Проблемы со связью приходят как `httpx.TimeoutException`.
-
-## Скрипты по расписанию
-
-```python
-import os
-from datetime import datetime, timedelta, timezone
-
-from x3ui import Panel
-
-deadline = (datetime.now(timezone.utc) + timedelta(days=3)).timestamp() * 1000
-
-with Panel(os.environ["PANEL_URL"], token=os.environ["PANEL_TOKEN"]) as panel:
-    expiring = [
-        client.email
-        for client in panel.clients.list()
-        if 0 < client.expiry_time < deadline
-    ]
-    if expiring:
-        panel.clients.extend(expiring, days=30)
-```
-
-В качестве контекстного менеджера `Panel` закрывает соединение на выходе. Токену не нужен ни вызов логина, ни сессия, которая может протухнуть, — как раз то, что нужно для cron.
-
-Самоподписанный сертификат на панели? Передайте `verify_ssl=False`. Медленный сервер? Передайте `timeout=60`.
+`X3uiError` несёт сообщение самой панели. Проблемы транспорта приходят исключениями `httpx`.
 
 ## Всё остальное
 
-Методы выше закрывают повседневные задачи. Ноды, хосты, бэкапы, конфиг Xray и остальные 186 эндпоинтов панели тоже доступны:
+Панель отдаёт 186 эндпоинтов, ярлыки выше покрывают ходовые. Остальные сгенерированы и принимают `panel.raw` как клиент:
 
 ```python
 from x3ui._generated.api.nodes import get_panel_api_nodes_list
 
-print(get_panel_api_nodes_list.sync(client=panel.raw).obj)
+get_panel_api_nodes_list.sync(client=panel.raw)
 ```
 
-Требуется Python 3.10 или новее. Заметки для разработки и инструкция по регенерации под свою панель — в [CONTRIBUTING.md](CONTRIBUTING.md).
+У каждого есть вариант `asyncio`. Конверт `{success, msg, obj}` они отдают как есть.
+
+## Заметки
+
+Что панель считает в байтах, остаётся байтами: `traffic()` возвращает `up`, `down`, `total`, где `0` — безлимит. Метки времени — Unix-миллисекунды.
+
+`email` — идентификатор клиента, не обязательно адрес.
+
+Python 3.10+. Сгенерировано под 3x-ui 3.x. Регенерация описана в [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Лицензия
 

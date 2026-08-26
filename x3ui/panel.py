@@ -231,6 +231,7 @@ class _Clients:
         email: str,
         *,
         new_email: str | None = None,
+        uuid: str | None = None,
         password: str | None = None,
         auth: str | None = None,
         limit_ip: int | None = None,
@@ -268,9 +269,10 @@ class _Clients:
         )
         current.update(changes)
 
-        uuid = current.pop("uuid", None)
-        if uuid:
-            current["id"] = uuid
+        identifier = uuid or current.pop("uuid", None)
+        current.pop("uuid", None)
+        if identifier:
+            current["id"] = identifier
         else:
             current.pop("id", None)
 

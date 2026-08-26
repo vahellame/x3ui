@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `bulk_delete`, `bulk_reset_traffic`, and `extend` for adding time and traffic
   to many clients at once.
 - `delete_depleted` and `delete_orphans` for routine cleanup.
+- `uuid` argument on `clients.update`, for rotating a client's protocol
+  identifier without recreating them.
 
 ### Changed
 
